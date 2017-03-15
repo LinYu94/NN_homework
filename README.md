@@ -1,2 +1,2 @@
 # NN_homework
-neural networ kkkkk
+neural network
