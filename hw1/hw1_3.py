@@ -5,6 +5,10 @@ from numpy import *;
 import numpy as np;
 import math;
 import datetime;
+import random
+
+from matplotlib import pyplot as plt
+from matplotlib import font_manager
 
 f = open('./log1.txt', 'w')
 
@@ -39,12 +43,12 @@ class Perception(object):
 		self.func = func
 		self.funcp = funcp
 		self.u = np.zeros((1,input_num))
-		self.u[0][0] = 1
-		self.u[0][1] = -0.8
+		self.u[0][0] = random.random()*2.4 - 1.2
+		self.u[0][1] = random.random()*2.4 - 1.2
 		self.v = np.zeros((1,input_num))
-		self.v[0][0] = 1.3
-		self.v[0][1] = -0.2
-		self.b = 0.1
+		self.v[0][0] = random.random()*2.4 - 1.2
+		self.v[0][1] = random.random()*2.4 - 1.2
+		self.b = random.random()*2.4 - 1.2
 	def forCal(self, input_):
 		#计算出净输出和输出
 		self.input_ = input_
@@ -77,7 +81,7 @@ class MultyLayerNeuralNetwork(object):
 		self.lerning_rate = lerning_rate
 		self.iteration = 0
 		self.network = []
-
+		self.correct_sum = 0
 		i=1
 		while i<len(numbers):
 			curLayer = []
@@ -88,40 +92,34 @@ class MultyLayerNeuralNetwork(object):
 			self.network.append(curLayer)
 			i = i + 1
 
-	def readData(self, filename):
-		#读取文件，返回数据集
-		path = './'
-		data = []
-		with open(path + filename, 'r') as f:
-			for line in f.readlines():
-				a = line.strip().split('\t')
-				data.append([float(x) for x in a])
-		#print(data)
-		return data
+	
 
-	def trainning(self):
+	def trainning(self, data, name=''):
+		print("神经元",name,"开始训练")
 		#对每一个数据
-		data = self.readData('two_spiral_train.txt')
-		#data = [[0,0,0],[1,1,0],[1,0,1],[0,1,1]]
+		self.data = data
+		#data = [[0,0,0],[1,1,0],[1,0,1],[0,1,1]] 异或问题训练
 		self.end = False
 		self.iteration = 0
 		self.err = 0
 		self.rate = 1.0
-		while self.rate > 0.0001 and self.iteration < 300 :
-			correct_sum = 0
+		self.correct_sum = 0
+		while self.rate > 0.0001 and self.iteration < 300:
+			random.shuffle(self.data)
+			self.correct_sum = 0
 			tmp = 0
-			for x in data:
+			for x in self.data:
 				item = np.array([[x[0]],[x[1]]])
-				t = hardlim(x[2]-0.5)
+				t = hardlim(x[2])
 				res = self.forward_pro(item)
 				if (res >0.5 and t==1) or (res <0.5 and t==0):
-					correct_sum = correct_sum + 1
+					self.correct_sum = self.correct_sum + 1
 				error = t - res
 				tmp = tmp + pow(error,2)
 				self.back_pro(error)
 				self.update()
 			self.iteration = self.iteration + 1
-			print(correct_sum)
+			#print(correct_sum)
 			#if correct_sum == 4:
 				#break
 			if self.err == 0:
@@ -129,19 +127,20 @@ class MultyLayerNeuralNetwork(object):
 			else:
 				self.rate = abs(tmp-self.err)/self.err
 				self.err = tmp
-		print("迭代了",self.iteration,"次")
+		print("神经元",name,"迭代了",self.iteration,"次","训练数据一共",len(self.data),",正确了", self.correct_sum)
+
 	def forward_pro(self, item):
 		#前向网络，计算各个神经元的净输入和输出，返回最终结果
 		i = 0
-		input = item
+		inputx = item
 		while i < self.layer:
 			j = 0
 			tmp = np.zeros((len(self.network[i]),1))
 			while j < len(self.network[i]):
-				self.network[i][j].forCal(input)
+				self.network[i][j].forCal(inputx)
 				tmp[j][0] = self.network[i][j].output_
 				j = j + 1
-			input = tmp
+			inputx = tmp
 			i = i + 1
 		return self.network[self.layer-1][0].output_
 	
@@ -164,7 +163,7 @@ class MultyLayerNeuralNetwork(object):
 					v_vec[k][0] = self.network[i+1][k].v[0][j]
 					k = k + 1
 				self.network[i][j].backCalForHide(leta_vec, u_vec, v_vec)
-				j=j + 1
+				j = j + 1
 			i = i - 1
 
 	def update(self):
@@ -176,15 +175,16 @@ class MultyLayerNeuralNetwork(object):
 				self.network[i][j].update()
 				j = j + 1
 			i = i + 1
-	def test(self):
+	def test(self, data, name=""):
+		print("测试正确个数:",self.correct_sum)
 		#测试训练效果
-		data = self.readData('two_spiral_test.txt')
-		#data = [[0,0,0],[1,1,0],[1,0,1],[0,1,1]]
+		self.data = data
+		#self.data = [[0,0,0],[1,1,0],[1,0,1],[0,1,1]] 异或问题
 		correct_sum = 0
 		f.write('[')
-		for x in data:
+		for x in self.data:
 			item = np.array([[x[0]],[x[1]]])
-			t = hardlim(x[2]-0.5)
+			t = hardlim(x[2])
 			res = self.forward_pro(item)
 			f.write('['+str(x[0])+','+str(x[1])+',')
 			if res >0.5:
@@ -194,10 +194,44 @@ class MultyLayerNeuralNetwork(object):
 			if (res >0.5 and t==1) or (res <0.5 and t==0):
 				correct_sum = correct_sum + 1
 			#print(x,",",res)
-		print("一共：",len(data))
-		print("正确",correct_sum)
+		print("数据一共：",len(self.data))
+		print("神经元",name,"正确",correct_sum)
+
+	def plot(self, xdata, ydata):
+		plt.figure(figsize=(8, 5), dpi=80)
+		axes = plt.subplot(111)
+
+		xdata = np.array(xdata)
+		ydata = np.array(ydata)
+		type1_x = []
+		type1_y = []
+		type2_x = []
+		type2_y = []
+		n = 100
+		x = np.linspace(-3.5,3.5,n)
+		y = np.linspace(-3.5,3.5,n)
+
+		for i in x:
+			for j in y:
+				item = np.array([[i],[j]])
+				res = self.forward_pro(item)
+				if res > 0.5:
+					type1_x.append(i)
+					type1_y.append(j)
+				else:
+					type2_x.append(i)
+					type2_y.append(j)
+
+		type1 = axes.scatter(type1_x, type1_y, s=20, alpha=0.4, c='grey')
+		type2 = axes.scatter(type2_x, type2_y, s=40, alpha=0.4, c='white')
+
+		plt.scatter(xdata[:, 0], xdata[:, 1], c='red', cmap=plt.cm.Paired)
+		plt.scatter(ydata[:, 0], ydata[:, 1], c='green', cmap=plt.cm.Paired)
+
+		plt.show()
+
 def hardlim(n):
-	if n>0:
+	if n>=0.5:
 		return 1
 	return 0
 
@@ -208,13 +242,27 @@ def sigmoidp(n):
 	x = pow(math.e, -n)
 	return x/pow(1+x, 2)
 
+def readData(filename):
+	#读取文件，返回数据集
+	data = []
+	with open(filename, 'r') as f:
+		for line in f.readlines():
+			a = line.strip().split('\t')
+			data.append([float(x) for x in a])
+	#print(data)
+	return data
 
-network = MultyLayerNeuralNetwork(3,0.5,[2,10,1])
-#network.readData('two_spiral_train.txt')
-begin = datetime.datetime.now()
-network.trainning()
-end = datetime.datetime.now()
-print("训练时间：",end-begin)
-network.test()
+if __name__=='__main__':
+	nn = MultyLayerNeuralNetwork(3,0.5,[2,10,1])
+	#network.readData('two_spiral_train.txt')
+	begin = datetime.datetime.now()
 
-f.close()
+	data = readData('./two_spiral_train.txt')
+	nn.trainning(data)
+
+	end = datetime.datetime.now()
+	print("训练时间：",end-begin)
+
+	data = readData('./two_spiral_test.txt')
+	nn.test(data)
+	f.close()
